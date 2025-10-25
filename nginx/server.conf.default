@@ -1,0 +1,66 @@
+# 1. must allow traversal to the root path
+# - e.g.
+# - chmod 755 /home /home/mpo /home/mpo/wdttgo /home/mpo/wdttgo/www
+# 2. add localhost domain to be discovered in /etc/hosts
+# 3. must include this config in /etc/nginx/nginx.conf
+# 4. certbot (prod)
+# - get certs: certbot certonly --webroot -w /home/mpo/wdttgo/www/test -d testing.loc --config-dir /home/mpo/wdttgp/certs/config --work-dir /home/mpo/wdttgo/certs/work --logs-dir /home/mpo/wdttgo/certs/logs --dry-run 
+# 5. mkcert (dev)
+# - mkcert test.loc !in certs/dev! 
+#
+# Name: test
+server {
+  listen		80;
+  server_name		test.loc;
+
+  return 301 		https://$host$request_uri;
+}
+
+server {
+  listen        	443 ssl http2;
+  server_name   	test.loc;
+
+  root          	/home/mpo/wdttgo/www/test;
+  index         	index.php index.html index.htm;
+
+  ssl_certificate	/home/mpo/wdttgo/certs/dev/test.loc.pem;
+  ssl_certificate_key	/home/mpo/wdttgo/certs/dev/test.loc-key.pem;
+
+  access_log    	/home/mpo/wdttgo/www/logs/access.log;
+  error_log     	/home/mpo/wdttgo/www/logs/error.log;
+
+  location / {
+    try_files   	$uri $uri/ /index.php?$query_string;
+  }
+
+  location ~ \.php$ {
+    include         	fastcgi_params;
+
+    fastcgi_pass    	unix:/run/php-fpm/php-fpm.sock;
+    fastcgi_param   	SCRIPT_FILENAME $document_root$fastcgi_script_name;
+
+    # deny execution in dirs
+    location ~* /(db|files)/.*\.php$ {
+      deny          	all;
+    }
+  }
+
+  # deny access to dotfiles
+  location ~* /\. {
+    deny            	all;
+  }
+
+  # headers
+  add_header 		X-Content-Type-Options nosniff;
+  add_header 		X-Frame-Options SAMEORIGIN;
+  add_header 		X-XSS-Protection "1; mode=block";
+
+  # http responses fallbacks
+  error_page 		404 /40x.html;
+  error_page 		500 502 503 504 /50x.html;
+
+  location ~* /(40x|50x)/.*\.html {
+    root 		/home/mpo/wdttgo/www;
+  }
+}
+
